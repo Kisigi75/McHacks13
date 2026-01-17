@@ -1,0 +1,7 @@
+node_modules
+.DS_Store
+.nyc_output
+Thumbs.db
+coverage
+benchmark/testdata*
+benchmark/github-commit-status.json
