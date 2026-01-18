@@ -22,7 +22,7 @@ export default function Results() {
     async function fetchReceipts() {
       setLoading(true);
       try {
-        const res = await fetch("http://127.0.0.1:8000/receipts");
+        const res = await fetch("http://127.0.0.1:8005/receipts");
         const data = await res.json();
         setReceipts(data);
       } catch (err) {
