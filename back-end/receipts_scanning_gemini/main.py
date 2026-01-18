@@ -1,10 +1,23 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,UploadFile, File, Form
 import psycopg2
-import json
+from psycopg2.extras import Json
+from datetime import date
+from scanning import scan_receipt
+from db import conn 
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
 
-DATABASE_URL = "postgresql://doadmin:AVNS_Uf3hBRDfQfHECgzKeVZ@db-mchacks13-transactions-do-user-32143408-0.k.db.ondigitalocean.com:25060/defaultdb"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DATABASE_URL = "_"
 
 @app.get("/receipts")
 def get_receipts():
@@ -48,3 +61,28 @@ def get_receipts():
         }
         for r in rows
     ]
+
+
+@app.post("/scan")
+async def scan(receipt: UploadFile = File(...), person_id: str = Form(...), category: str = Form("")):
+    file_bytes = await receipt.read()
+    mime = receipt.content_type or "image/jpeg"
+    result = scan_receipt(file_bytes, mime)
+    return result
+
+
+@app.get("/employees")
+def get_employees():
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, first_name, last_name, department
+            FROM employees
+            ORDER BY id
+        """)
+        rows = cur.fetchall()
+
+    return [
+        {"id": r[0], "first_name": r[1], "last_name": r[2], "department": r[3]}
+        for r in rows
+    ]
+
