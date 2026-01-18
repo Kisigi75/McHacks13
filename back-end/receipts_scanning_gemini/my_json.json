@@ -1,0 +1,38 @@
+{
+    "merchant": "Provigo",
+    "date": "2025-10-03",
+    "total": 35.54,
+    "currency": "CAD",
+    "items": [
+      {
+        "name": "PC TORTILLA REST",
+        "quantity": 2,
+        "price": 7.0
+      },
+      {
+        "name": "SAUCE AUX CACAHU MRJ",
+        "quantity": 1,
+        "price": 5.49
+      },
+      {
+        "name": "SN CREME SURE MRJ",
+        "quantity": 1,
+        "price": 2.99
+      },
+      {
+        "name": "PC POULET BEURRE MRJ",
+        "quantity": 1,
+        "price": 5.5
+      },
+      {
+        "name": "SM TART CITROUIL MRJ",
+        "quantity": 1,
+        "price": 9.5
+      },
+      {
+        "name": "STR RING DON 2PK",
+        "quantity": 1,
+        "price": 3.49
+      }
+    ]
+  }
