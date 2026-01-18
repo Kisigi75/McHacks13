@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 
+// theme for style
 const THEME = {
   bg: "#F5F7FF",
   card: "#FFFFFF",
