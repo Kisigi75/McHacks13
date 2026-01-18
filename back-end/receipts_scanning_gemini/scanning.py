@@ -19,6 +19,10 @@ RESPONSE_SCHEMA = {
         "date": {"type": "STRING"},
         "total": {"type": "NUMBER"},
         "currency": {"type": "STRING"},
+        "category": {
+            "type": "STRING",
+            "enum": ["groceries", "restaurant", "travel", "gift", "shopping", "transport", "health", "other"]
+        },
         "items": {
             "type": "ARRAY",
             "items": {
@@ -36,10 +40,6 @@ RESPONSE_SCHEMA = {
 }
 
 def extract_text_from_response(txt_response):
-    # New SDK sometimes doesn't fill resp.text; extract from candidates
-    if getattr(txt_response, "text", None):
-        return txt_response.text
-
     try:
         parts = txt_response.candidates[0].content.parts
         # join any text parts
@@ -53,6 +53,7 @@ def scan_receipt(bytes, type):
         contents=[
             types.Part.from_bytes(data=bytes, mime_type=type),
             "Analyze this receipt and extract the data into the specified JSON format."
+            "Also choose the best 'category' from the allowed list based on merchant/items."
         ],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -61,9 +62,30 @@ def scan_receipt(bytes, type):
     )
 
     raw = extract_text_from_response(resp).strip()
-    if not raw:
-        raise RuntimeError(f"No text returned. Raw response: {resp}")
+    data = json.loads(raw)
 
-    return json.loads(raw)
+    data = normalize_strings(data)
+    print("CLEANED ITEMS:", data.get("items"))
+
+    return data
+
+def fix_code_cleaning(s: str) -> str:
+    if not isinstance(s, str):
+        return s
+    try:
+        return s.encode("latin1").decode("utf-8")
+    except Exception:
+        return s
+    
+def normalize_strings(obj):
+    if isinstance(obj, dict):
+        return {k: normalize_strings(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [normalize_strings(v) for v in obj]
+    if isinstance(obj, str):
+        return fix_code_cleaning(obj)
+    return obj
+
+
 
 

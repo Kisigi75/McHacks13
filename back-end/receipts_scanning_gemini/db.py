@@ -1,9 +1,16 @@
 import psycopg2
 
-<<<<<<< HEAD
-DATABASE_URL = "postgresql://doadmin:AVNS_t3dZlVEidpe5D7Oqoue@db-mchacks13-rdek-do-user-32143408-0.h.db.ondigitalocean.com:25060/defaultdb"
-=======
-DATABASE_URL = ""
->>>>>>> a6b67baf16405991ad481731d1bee900717fb93c
+# Employee database
+EMPLOYEE_DATABASE_URL = "postgresql://doadmin:AVNS_t3dZlVEidpe5D7Oqoue@db-mchacks13-rdek-do-user-32143408-0.h.db.ondigitalocean.com:25060/defaultdb"
 
-conn = psycopg2.connect(DATABASE_URL)
+
+# Receipts database
+RECEIPTS_DATABASE_URL = "postgresql://doadmin:AVNS_Uf3hBRDfQfHECgzKeVZ@db-mchacks13-transactions-do-user-32143408-0.k.db.ondigitalocean.com:25060/defaultdb"
+
+
+def get_employee_conn():
+    return psycopg2.connect(EMPLOYEE_DATABASE_URL)
+
+
+def get_receipts_conn():
+    return psycopg2.connect(RECEIPTS_DATABASE_URL)
