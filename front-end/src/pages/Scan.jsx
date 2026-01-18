@@ -206,7 +206,6 @@ export default function Scan() {
       const form = new FormData();
       form.append("receipt", file);
       form.append("person_id", "6");
-      form.append("category", person);
 
       const res = await fetch("http://127.0.0.1:8005/scan", {
         method: "POST",
