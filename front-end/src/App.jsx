@@ -1,5 +1,9 @@
-import HelloWorld from "./components/HelloWorld";
+import Scan from "./pages/Scan";
 
 export default function App() {
-  return <HelloWorld></HelloWorld>
+  return (
+    <div style={{ padding: 24 }}>
+      <Scan />
+    </div>
+  );
 }
