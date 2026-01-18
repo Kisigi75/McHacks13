@@ -7,7 +7,7 @@ app = FastAPI()
 def get_employees():
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT id, first_name, last_name, department
+            SELECT id, first_name, last_name, department, password, is_admin
             FROM employees
             ORDER BY id
         """)
@@ -18,7 +18,7 @@ def get_employees():
             "id": r[0],
             "first_name": r[1],
             "last_name": r[2],
-            "department": r[3]
+            "department": r[3],
         }
         for r in rows
     ]
