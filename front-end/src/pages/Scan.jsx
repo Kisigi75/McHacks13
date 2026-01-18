@@ -6,7 +6,7 @@ const THEME = {
   border: "#E6E8F2",
   text: "#0B1020",
   muted: "#5B647A",
-  primary: "#1E40FF",     // royal blue
+  primary: "#1E40FF", // royal blue
   primary2: "#1A35D6",
   soft: "#EEF2FF",
   dangerBg: "#FFF1F2",
@@ -25,6 +25,59 @@ export default function Scan() {
 
   const fileInputRef = useRef(null);
 
+  // Learn more modal state
+  const [learnOpen, setLearnOpen] = useState(false);
+  const [learnKey, setLearnKey] = useState(null);
+
+  // Learn more content
+  const USE_CASES = {
+    expense: {
+      title: "Expense tracking",
+      bullets: [
+        "Automatically extract totals, dates, and merchants so you don’t type anything.",
+        "Assign each receipt to a person (roommates, trips, group projects).",
+        "Export to CSV/JSON so you can paste into Excel/Sheets or a budgeting workflow.",
+      ],
+      exampleTitle: "Example export",
+      example: {
+        person: "Dimana",
+        merchant: "Starbucks",
+        date: "2026-01-17",
+        total: "$42.13",
+        flags: ["Tip detected"],
+      },
+    },
+    reimburse: {
+      title: "Reimbursements",
+      bullets: [
+        "Convert messy photos into structured fields finance teams need.",
+        "Confidence + flags highlight which receipts need a quick manual check.",
+        "Export JSON/CSV now, and later auto-fill an expense form.",
+      ],
+      exampleTitle: "Why flags help",
+      example: {
+        confidence: 0.62,
+        flags: ["Multiple totals found", "Low-quality image"],
+        action: "User review required",
+      },
+    },
+    insights: {
+      title: "Budget insights",
+      bullets: [
+        "Track spending patterns by merchant over time (coffee, groceries, transit).",
+        "Detect anomalies (duplicate charges, suspicious totals, weird tips).",
+        "Build weekly/monthly summaries once scans are stored in a DB.",
+      ],
+      exampleTitle: "Simple insight you can add next",
+      example: {
+        topMerchant: "IGA",
+        weeklySpend: "$214.60",
+        anomaly: "2 receipts same total within 5 minutes",
+      },
+    },
+  };
+
+  // Clean up blob URLs to avoid memory leaks
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -57,6 +110,7 @@ export default function Scan() {
       setNewFile(null);
       return;
     }
+
     setNewFile(f);
   }
 
@@ -104,10 +158,7 @@ export default function Scan() {
       for (const it of items) rows.push([it.name ?? "", it.price ?? ""]);
     }
 
-    const csv = rows
-      .map((r) => r.map((x) => `"${String(x).replaceAll('"', '""')}"`).join(","))
-      .join("\n");
-
+    const csv = rows.map((r) => r.map((x) => `"${String(x).replaceAll('"', '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -190,11 +241,8 @@ export default function Scan() {
     e.stopPropagation();
   }
 
-  const fileLabel = file
-    ? `${file.name} (${Math.ceil(file.size / 1024)} KB)`
-    : "Drag & drop an image/PDF here or click to upload";
+  const fileLabel = file ? `${file.name} (${Math.ceil(file.size / 1024)} KB)` : "Drag & drop an image/PDF here or click to upload";
 
-  // small reusable style helpers (no extra libs)
   const cardStyle = {
     padding: 22,
     borderRadius: 18,
@@ -214,7 +262,6 @@ export default function Scan() {
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    transition: "transform 120ms ease, box-shadow 120ms ease, background 120ms ease",
     userSelect: "none",
   };
 
@@ -250,6 +297,21 @@ export default function Scan() {
         color: THEME.text,
       }}
     >
+      <style>{`
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+        @media (max-width: 980px) {
+          .grid-2 { grid-template-columns: 1fr; }
+          .grid-4 { grid-template-columns: repeat(2, 1fr); }
+          .grid-3 { grid-template-columns: 1fr; }
+        }
+
+        button:hover { transform: translateY(-1px); }
+        button:disabled:hover { transform: none; }
+      `}</style>
+
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, marginBottom: 14 }}>
@@ -266,9 +328,7 @@ export default function Scan() {
               />
               <h1 style={{ margin: 0, fontSize: 28, letterSpacing: -0.4 }}>Scan Receipt</h1>
             </div>
-            <div style={{ marginTop: 6, color: THEME.muted, fontSize: 13 }}>
-              Upload → extract total/merchant/date → export JSON/CSV
-            </div>
+            <div style={{ marginTop: 6, color: THEME.muted, fontSize: 13 }}>Upload → extract fields → export JSON/CSV</div>
           </div>
 
           <div
@@ -287,13 +347,14 @@ export default function Scan() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-          {/* LEFT */}
+        {/* TOP GRID */}
+        <div className="grid-2">
+          {/* LEFT: Upload */}
           <div style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18 }}>Upload</h2>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, color: THEME.muted, fontWeight: 700 }}>Person</span>
                 <select
                   value={person}
@@ -315,21 +376,14 @@ export default function Scan() {
                   <option>Other</option>
                 </select>
 
-                <button onClick={openFilePicker} style={btnSoft}>
+                <button onClick={openFilePicker} style={btnSoft} type="button">
                   Choose file
                 </button>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handleFileChange}
-                  style={{ display: "none" }}
-                />
+                <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleFileChange} style={{ display: "none" }} />
               </div>
             </div>
 
-            {/* Dropzone */}
             <div
               onDrop={onDrop}
               onDragOver={onDragOver}
@@ -352,7 +406,6 @@ export default function Scan() {
               <div style={{ marginTop: 6, color: THEME.muted, fontSize: 13 }}>{fileLabel}</div>
             </div>
 
-            {/* Preview */}
             {previewUrl && (
               <img
                 src={previewUrl}
@@ -379,32 +432,25 @@ export default function Scan() {
                   fontSize: 13,
                 }}
               >
-                <b style={{ color: THEME.text }}>Selected:</b> {file.name}{" "}
-                <span style={{ opacity: 0.8 }}>(Preview available for images)</span>
+                <b style={{ color: THEME.text }}>Selected:</b> {file.name} <span style={{ opacity: 0.8 }}>(Preview available for images)</span>
               </div>
             )}
 
-            {/* ACTION ROW (aligned + pretty) */}
             <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
                 onClick={handleScan}
                 disabled={!file || loading}
-                style={{
-                  ...btnPrimary,
-                  opacity: !file || loading ? 0.55 : 1,
-                  cursor: !file || loading ? "not-allowed" : "pointer",
-                }}
-                onMouseDown={(e) => e.currentTarget.style.transform = "translateY(1px)"}
-                onMouseUp={(e) => e.currentTarget.style.transform = "translateY(0px)"}
+                style={{ ...btnPrimary, opacity: !file || loading ? 0.55 : 1, cursor: !file || loading ? "not-allowed" : "pointer" }}
+                type="button"
               >
                 {loading ? "Scanning…" : "Scan"}
               </button>
 
-              <button onClick={() => reset(true)} style={btnGhost}>
+              <button onClick={() => reset(true)} style={btnGhost} type="button">
                 Reset
               </button>
 
-              <button onClick={loadDemoResult} style={btnGhost}>
+              <button onClick={loadDemoResult} style={btnGhost} type="button">
                 Demo Result
               </button>
             </div>
@@ -416,14 +462,7 @@ export default function Scan() {
                   <span style={{ fontWeight: 800, color: THEME.primary2 }}>{progress}%</span>
                 </div>
                 <div style={{ marginTop: 8, height: 10, borderRadius: 999, border: `1px solid ${THEME.border}`, overflow: "hidden" }}>
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${progress}%`,
-                      borderRadius: 999,
-                      background: `linear-gradient(90deg, ${THEME.primary}, ${THEME.primary2})`,
-                    }}
-                  />
+                  <div style={{ height: "100%", width: `${progress}%`, borderRadius: 999, background: `linear-gradient(90deg, ${THEME.primary}, ${THEME.primary2})` }} />
                 </div>
               </div>
             )}
@@ -447,15 +486,8 @@ export default function Scan() {
                 </div>
                 <button
                   onClick={() => setError("")}
-                  style={{
-                    ...btnBase,
-                    height: 34,
-                    padding: "0 10px",
-                    borderRadius: 12,
-                    border: `1px solid ${THEME.dangerBorder}`,
-                    background: "white",
-                    fontWeight: 800,
-                  }}
+                  style={{ ...btnBase, height: 34, padding: "0 10px", borderRadius: 12, border: `1px solid ${THEME.dangerBorder}`, background: "white", fontWeight: 800 }}
+                  type="button"
                 >
                   Dismiss
                 </button>
@@ -463,35 +495,17 @@ export default function Scan() {
             )}
           </div>
 
-          {/* RIGHT */}
+          {/* RIGHT: Results */}
           <div style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <h2 style={{ margin: 0, fontSize: 18 }}>Results</h2>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  onClick={downloadJSON}
-                  disabled={!result}
-                  style={{
-                    ...btnGhost,
-                    height: 40,
-                    opacity: result ? 1 : 0.5,
-                    cursor: result ? "pointer" : "not-allowed",
-                  }}
-                >
+                <button onClick={downloadJSON} disabled={!result} style={{ ...btnGhost, height: 40, opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }} type="button">
                   Download JSON
                 </button>
 
-                <button
-                  onClick={downloadCSV}
-                  disabled={!result}
-                  style={{
-                    ...btnGhost,
-                    height: 40,
-                    opacity: result ? 1 : 0.5,
-                    cursor: result ? "pointer" : "not-allowed",
-                  }}
-                >
+                <button onClick={downloadCSV} disabled={!result} style={{ ...btnGhost, height: 40, opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }} type="button">
                   Download CSV
                 </button>
               </div>
@@ -531,9 +545,7 @@ export default function Scan() {
                   <div style={{ marginTop: 14 }}>
                     <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 800 }}>Confidence</div>
                     <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ fontWeight: 900, fontSize: 16 }}>
-                        {Math.round((result.confidence ?? 0) * 100)}%
-                      </div>
+                      <div style={{ fontWeight: 900, fontSize: 16 }}>{Math.round((result.confidence ?? 0) * 100)}%</div>
                       <div style={{ flex: 1, height: 10, borderRadius: 999, border: `1px solid ${THEME.border}`, overflow: "hidden" }}>
                         <div
                           style={{
@@ -566,30 +578,13 @@ export default function Scan() {
                     <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 900 }}>Line items (demo)</div>
 
                     <div style={{ marginTop: 10, border: `1px solid ${THEME.border}`, borderRadius: 16, overflow: "hidden" }}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 120px",
-                          padding: 12,
-                          fontWeight: 900,
-                          background: THEME.soft,
-                          color: THEME.primary2,
-                        }}
-                      >
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", padding: 12, fontWeight: 900, background: THEME.soft, color: THEME.primary2 }}>
                         <div>Item</div>
                         <div style={{ textAlign: "right" }}>Price</div>
                       </div>
 
                       {result.items.map((it, idx) => (
-                        <div
-                          key={`${it.name}-${idx}`}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 120px",
-                            padding: 12,
-                            borderTop: `1px solid ${THEME.border}`,
-                          }}
-                        >
+                        <div key={`${it.name}-${idx}`} style={{ display: "grid", gridTemplateColumns: "1fr 120px", padding: 12, borderTop: `1px solid ${THEME.border}` }}>
                           <div style={{ color: THEME.text }}>{it.name}</div>
                           <div style={{ textAlign: "right", fontWeight: 800 }}>{it.price}</div>
                         </div>
@@ -602,19 +597,331 @@ export default function Scan() {
           </div>
         </div>
 
-        <p style={{ marginTop: 14, opacity: 0.55, fontSize: 12, color: THEME.muted }}>
-          {/* optional footer */}
-        </p>
+        {/* BELOW */}
+        <Section title="How it works" subtitle="How to get reimbursed.">
+          <div className="grid-4">
+            <StepCard n="1" title="Upload" desc="Drop an image or PDF receipt." theme={THEME} />
+            <StepCard n="2" title="Extract" desc="OCR + field parsing (merchant, date, total)." theme={THEME} />
+            <StepCard n="3" title="Validate" desc="Confidence scoring + flags when uncertain." theme={THEME} />
+            <StepCard n="4" title="Export" desc="Download JSON/CSV for tracking or audits." theme={THEME} />
+          </div>
+        </Section>
+
+        <Section title="Use cases" subtitle="Click learn more for details.">
+          <div className="grid-3">
+            <UseCaseCard
+              title="Expense tracking"
+              desc="Auto-log totals by person and export to spreadsheets."
+              theme={THEME}
+              onLearn={() => {
+                setLearnKey("expense");
+                setLearnOpen(true);
+              }}
+            />
+            <UseCaseCard
+              title="Reimbursements"
+              desc="Structured data for approvals and faster processing."
+              theme={THEME}
+              onLearn={() => {
+                setLearnKey("reimburse");
+                setLearnOpen(true);
+              }}
+            />
+            <UseCaseCard
+              title="Budget insights"
+              desc="Spot patterns + anomalies over time."
+              theme={THEME}
+              onLearn={() => {
+                setLearnKey("insights");
+                setLearnOpen(true);
+              }}
+            />
+          </div>
+        </Section>
+
+        <TechFooter theme={THEME} />
+
+        {/* ✅ MODAL RENDER */}
+        <LearnMoreModal
+          open={learnOpen}
+          onClose={() => setLearnOpen(false)}
+          theme={THEME}
+          data={learnKey ? USE_CASES[learnKey] : null}
+        />
       </div>
     </div>
   );
 }
 
+/* ---------- helper components ---------- */
+
 function Field({ label, value }) {
   return (
     <div>
-      <div style={{ fontSize: 12, color: "#5B647A", fontWeight: 900 }}>{label}</div>
+      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 900 }}>{label}</div>
       <div style={{ marginTop: 6, fontWeight: 800 }}>{value ?? ""}</div>
     </div>
   );
 }
+
+function Section({ title, subtitle, children }) {
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div>
+        <h3 style={{ margin: 0, fontSize: 18, letterSpacing: -0.2 }}>{title}</h3>
+        {subtitle && <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>{subtitle}</div>}
+      </div>
+      <div style={{ marginTop: 12 }}>{children}</div>
+    </div>
+  );
+}
+
+function StepCard({ n, title, desc, theme }) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 16,
+        border: `1px solid ${theme.border}`,
+        background: "white",
+        boxShadow: "0 12px 26px rgba(20, 30, 70, 0.06)",
+        minHeight: 96,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 12,
+            background: `linear-gradient(180deg, ${theme.primary}, ${theme.primary2})`,
+            color: "white",
+            fontWeight: 900,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {n}
+        </div>
+        <div style={{ fontWeight: 900, letterSpacing: -0.2 }}>{title}</div>
+      </div>
+      <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13, lineHeight: 1.35 }}>{desc}</div>
+    </div>
+  );
+}
+
+function UseCaseCard({ title, desc, theme, onLearn }) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 16,
+        border: `1px solid ${theme.border}`,
+        background: "white",
+        boxShadow: "0 12px 26px rgba(20, 30, 70, 0.06)",
+      }}
+    >
+      <div style={{ fontWeight: 950, letterSpacing: -0.2 }}>{title}</div>
+      <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13, lineHeight: 1.35 }}>{desc}</div>
+
+      <button
+        style={{
+          marginTop: 12,
+          height: 38,
+          padding: "0 12px",
+          borderRadius: 12,
+          border: `1px solid rgba(30,64,255,0.18)`,
+          background: theme.soft,
+          color: theme.primary2,
+          fontWeight: 900,
+          cursor: "pointer",
+        }}
+        onClick={onLearn}
+        type="button"
+      >
+        Learn more
+      </button>
+    </div>
+  );
+}
+
+function TechFooter({ theme }) {
+  const pills = ["React", "GeminiAPI", "Python", "SQL", "PostgreSQL", "Export JSON/CSV", "CSS", "JavaScript"];
+  return (
+    <div
+      style={{
+        marginTop: 22,
+        padding: 16,
+        borderRadius: 18,
+        border: `1px solid ${theme.border}`,
+        background: "rgba(255,255,255,0.85)",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 950, opacity: 0.75 }}>Built with</div>
+      <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 10 }}>
+        {pills.map((p) => (
+          <div
+            key={p}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: `1px solid rgba(30,64,255,0.18)`,
+              background: theme.soft,
+              color: theme.primary2,
+              fontWeight: 950,
+              fontSize: 12,
+            }}
+          >
+            {p}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LearnMoreModal({ open, onClose, theme, data }) {
+  if (!open) return null;
+
+  return (
+    <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(11,16,32,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 18,
+        zIndex: 9999,
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{
+          width: "min(720px, 100%)",
+          borderRadius: 18,
+          border: `1px solid ${theme.border}`,
+          background: "white",
+          boxShadow: "0 22px 60px rgba(0,0,0,0.25)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: 16,
+            borderBottom: `1px solid ${theme.border}`,
+            background: `linear-gradient(180deg, rgba(30,64,255,0.08), rgba(255,255,255,0))`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 1000, letterSpacing: -0.3, fontSize: 16 }}>{data?.title ?? "Learn more"}</div>
+            <div style={{ marginTop: 4, fontSize: 12, opacity: 0.75 }}>What this feature enables in the product</div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              height: 38,
+              padding: "0 12px",
+              borderRadius: 12,
+              border: `1px solid ${theme.border}`,
+              background: "white",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+
+        <div style={{ padding: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 950 }}>Key points</div>
+              <ul style={{ marginTop: 10, paddingLeft: 18 }}>
+                {(data?.bullets ?? []).map((b) => (
+                  <li key={b} style={{ marginBottom: 8, lineHeight: 1.4 }}>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 950 }}>{data?.exampleTitle ?? "Example"}</div>
+
+              <div
+                style={{
+                  marginTop: 10,
+                  borderRadius: 16,
+                  border: `1px solid rgba(30,64,255,0.18)`,
+                  background: `linear-gradient(180deg, rgba(30,64,255,0.06), rgba(255,255,255,0))`,
+                  padding: 12,
+                }}
+              >
+                <pre
+                  style={{
+                    margin: 0,
+                    fontSize: 12,
+                    lineHeight: 1.35,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                  }}
+                >
+                  {JSON.stringify(data?.example ?? {}, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              paddingTop: 14,
+              borderTop: `1px solid ${theme.border}`,
+            }}
+          >
+            <div style={{ fontSize: 12, opacity: 0.7 }}></div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                height: 40,
+                padding: "0 14px",
+                borderRadius: 14,
+                border: "1px solid rgba(30,64,255,0.35)",
+                background: `linear-gradient(180deg, ${theme.primary}, ${theme.primary2})`,
+                color: "white",
+                fontWeight: 950,
+                cursor: "pointer",
+                boxShadow: "0 10px 18px rgba(30,64,255,0.18)",
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+//jjj
