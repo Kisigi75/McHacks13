@@ -13,7 +13,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/scan" element={<Scan />} />
-        <Route path="/results" element={<Results />} />
+        <Route path="/results" element={<Results />
+} />
       </Routes>
     </BrowserRouter>
   );
