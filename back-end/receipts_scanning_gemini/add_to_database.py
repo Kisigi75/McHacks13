@@ -3,15 +3,15 @@ import json
 from datetime import datetime
 import psycopg2
 from psycopg2.extras import Json
+from scanning import scan_receipt
 
 # DB #1: People database (employees table)
-PEOPLE_DATABASE_URL = "_"
+PEOPLE_DATABASE_URL = "postgresql://doadmin:AVNS_t3dZlVEidpe5D7Oqoue@db-mchacks13-rdek-do-user-32143408-0.h.db.ondigitalocean.com:25060/defaultdb"
 
 # DB #2: Receipts database
-RECEIPTS_DATABASE_URL = "_"
+RECEIPTS_DATABASE_URL = "postgresql://doadmin:AVNS_Uf3hBRDfQfHECgzKeVZ@db-mchacks13-transactions-do-user-32143408-0.k.db.ondigitalocean.com:25060/defaultdb"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-JSON_PATH = os.path.join(BASE_DIR, "my_json.json")  
 
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS receipts (
@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   person_id INTEGER NOT NULL,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
+  department TEXT NOT NULL,
 
   merchant TEXT NOT NULL,
   receipt_date DATE,
@@ -41,13 +42,33 @@ def prompt(msg: str, allow_empty: bool = False) -> str:
 def parse_date(s: str):
     if not s:
         return None
-    return datetime.strptime(s, "%Y-%m-%d").date()
+
+    s = s.strip()
+
+    # Try multiple common receipt date formats
+    formats = [
+        "%Y-%m-%d",   # 2025-10-03
+        "%y/%m/%d",   # 25/10/03
+        "%d/%m/%y",   # 03/10/25
+        "%d/%m/%Y",   # 03/10/2025
+        "%m/%d/%Y",   # 10/03/2025 (US)
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+
+    # If none matched, fail clearly
+    raise ValueError(f"Unrecognized date format: '{s}'")
+
 
 def fetch_person_by_id(people_conn, person_id: int):
     with people_conn.cursor() as cur:
         cur.execute(
             """
-            SELECT id, first_name, last_name
+            SELECT id, first_name, last_name, department
             FROM employees
             WHERE id = %s
             """,
@@ -56,7 +77,8 @@ def fetch_person_by_id(people_conn, person_id: int):
         row = cur.fetchone()
         if not row:
             return None
-        return {"id": row[0], "first_name": row[1], "last_name": row[2]}
+        return {"id": row[0], "first_name": row[1], "last_name": row[2], "department": row[3]}
+
 
 def load_receipt_json(path: str) -> dict:
     if not os.path.exists(path):
@@ -94,12 +116,13 @@ def main():
         if person is None:
             raise ValueError(f"No employee found with id={person_id} in PEOPLE DB")
 
-        print(f"✅ Found employee: {person['first_name']} {person['last_name']} (id={person_id})")
+        print(f"✅ Found employee: {person['first_name']} {person['last_name']} ({person['department']}) (id={person_id})")
+
 
         # 2) load receipt data from file
-        print("\n--- Receipt JSON file ---")
-        json_path = prompt(f"Path to JSON [ENTER for {JSON_PATH}]: ", allow_empty=True) or JSON_PATH
-        receipt = load_receipt_json(json_path)
+        print("\n--- Receipt image ---")
+        image_filename = prompt("Image filename (e.g. PHOTO-2026-01-17-21-56-38.jpg): ")
+        receipt = scan_receipt(image_filename)
 
         merchant = receipt.get("merchant")
         currency = receipt.get("currency", "")
@@ -118,45 +141,40 @@ def main():
 
         # 4) insert
         with receipts_conn.cursor() as cur:
-            if created_at is None:
-                cur.execute(
-                    """
-                    INSERT INTO receipts (
-                        person_id, first_name, last_name,
-                        merchant, receipt_date, currency, total, category, items
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id;
-                    """,
-                    (
-                        person_id, person["first_name"], person["last_name"],
-                        merchant, receipt_date, currency, total, category, Json(items)
-                    ),
-                )
-            else:
-                cur.execute(
-                    """
-                    INSERT INTO receipts (
-                        person_id, first_name, last_name,
-                        merchant, receipt_date, created_at, currency, total, category, items
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id;
-                    """,
-                    (
-                        person_id, person["first_name"], person["last_name"],
-                        merchant, receipt_date, created_at, currency, total, category, Json(items)
-                    ),
-                )
+            cols = [
+                "person_id", "first_name", "last_name", "department",
+                "merchant", "receipt_date", "currency", "total", "category", "items"
+            ]
+            vals = [
+                person_id, person["first_name"], person["last_name"], person["department"],
+                merchant, receipt_date, currency, total, category, Json(items)
+            ]
 
-            receipt_id = cur.fetchone()[0]
+            if created_at is not None:
+                cols.insert(6, "created_at")   # after receipt_date (index depends on your list)
+                vals.insert(6, created_at)
+
+            placeholders = ", ".join(["%s"] * len(vals))
+            col_list = ", ".join(cols)
+
+            sql = f"""
+                INSERT INTO receipts ({col_list})
+                VALUES ({placeholders})
+                RETURNING id;
+            """
+
+            cur.execute(sql, tuple(vals))
+            row = cur.fetchone()
+            if row is None:
+                raise RuntimeError("Insert succeeded but no id returned (missing RETURNING id?)")
+            receipt_id = row[0]
+
 
         receipts_conn.commit()
 
         print(f"\n✅ Inserted receipt id={receipt_id}")
         print(f"   person={person['first_name']} {person['last_name']} (id={person_id})")
         print(f"   merchant={merchant}, total={total}, currency={currency}, items={len(items)}")
-        print(f"   json_file={json_path}")
 
     except Exception as e:
         receipts_conn.rollback()
